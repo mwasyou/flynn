@@ -56,6 +56,27 @@ func (s *State) Clone() *State {
 	return &res
 }
 
+func (x *State) Equal(y *State) bool {
+	if x == nil || y == nil {
+		return x == y
+	}
+	if len(x.Async) != len(y.Async) || len(x.Deposed) != len(y.Deposed) {
+		return false
+	}
+	// TODO(jpg): Probably nicer way to do this in Go.
+	for i := 0; i < len(x.Async); i++ {
+		if !peersEqual(x.Async[i], y.Async[i]) {
+			return false
+		}
+	}
+	for i := 0; i < len(x.Deposed); i++ {
+		if !peersEqual(x.Deposed[i], y.Deposed[i]) {
+			return false
+		}
+	}
+	return peersEqual(x.Primary, y.Primary) && peersEqual(x.Sync, y.Sync)
+}
+
 type FreezeDetails struct {
 	FrozenAt time.Time `json:"frozen_at"`
 	Reason   string    `json:"reason"`
@@ -119,6 +140,7 @@ type Config struct {
 	Role       Role                `json:"role"`
 	Upstream   *discoverd.Instance `json:"upstream"`
 	Downstream *discoverd.Instance `json:"downstream"`
+	State      *State              `json:"state"`
 }
 
 func peersEqual(a, b *discoverd.Instance) bool {
@@ -976,7 +998,7 @@ func (p *Peer) startUpdateAsyncs(newAsync []*discoverd.Instance) {
 		p.setState(p.updatingState)
 	}
 	p.updatingState = nil
-
+	p.triggerApplyConfig()
 	p.triggerEval()
 }
 
@@ -994,7 +1016,7 @@ func (p *Peer) applyConfig() (err error) {
 	}
 
 	config := p.Config()
-	if p.applied != nil && p.applied.Equal(config) {
+	if p.applied != nil && p.applied.Equal(config) && p.applied.State.Equal(config.State) {
 		log.Info("skipping config apply, no changes")
 		return nil
 	}
@@ -1057,7 +1079,7 @@ func (p *Peer) Config() *Config {
 	role := p.Info().Role
 	switch role {
 	case RolePrimary, RoleSync, RoleAsync:
-		return &Config{Role: role, Upstream: p.upstream, Downstream: p.downstream}
+		return &Config{Role: role, Upstream: p.upstream, Downstream: p.downstream, State: p.Info().State}
 	case RoleUnassigned, RoleDeposed:
 		return &Config{Role: RoleNone}
 	default:

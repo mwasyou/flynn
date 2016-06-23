@@ -165,6 +165,7 @@ type Job struct {
 	HostError  *string           `json:"host_error,omitempty"`
 	RunAt      *time.Time        `json:"run_at,omitempty"`
 	Restarts   *int32            `json:"restarts,omitempty"`
+	Reason     *string           `json:"reason,omitempty"`
 	CreatedAt  *time.Time        `json:"created_at,omitempty"`
 	UpdatedAt  *time.Time        `json:"updated_at,omitempty"`
 }

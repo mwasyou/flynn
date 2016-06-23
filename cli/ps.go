@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/flynn/go-docopt"
 )
 
+// TODO(jpg): Update example output with pending reason
 func init() {
 	register("ps", runPs, `
 usage: flynn ps [-a]
@@ -59,6 +61,17 @@ func runPs(args *docopt.Args, client controller.Client) error {
 		if !args.Bool["--all"] && j.State != ct.JobStateUp && j.State != ct.JobStatePending {
 			continue
 		}
+		state := string(j.State)
+		if j.State == ct.JobStatePending {
+			if j.Reason != nil {
+				reason := *j.Reason
+				if j.RunAt != nil {
+					runIn := units.HumanDuration(j.RunAt.UTC().Sub(time.Now().UTC()))
+					reason = fmt.Sprintf("%s - %s", reason, runIn)
+				}
+				state = fmt.Sprintf("pending (%s)", reason)
+			}
+		}
 		id := j.ID
 		if id == "" {
 			id = j.UUID
@@ -67,7 +80,7 @@ func runPs(args *docopt.Args, client controller.Client) error {
 		if j.CreatedAt != nil {
 			created = units.HumanDuration(time.Now().UTC().Sub(*j.CreatedAt)) + " ago"
 		}
-		listRec(w, id, j.Type, j.State, created, j.ReleaseID)
+		listRec(w, id, j.Type, state, created, j.ReleaseID)
 	}
 
 	return nil

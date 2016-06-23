@@ -717,8 +717,11 @@ func (s *Scheduler) HandlePlacementRequest(req *PlacementRequest) {
 	// if we didn't pick a host, the job's tags don't match any hosts so
 	// add it to s.pendingTagJobs and return an error to cause the
 	// StartJob goroutine to stop trying to place the job
+	// Update the pending reason and push job back to controller.
 	if req.Host == nil {
 		s.pendingTagJobs[req.Job.ID] = req.Job
+		req.Job.reason = "no hosts match job tags"
+		s.persistJob(req.Job)
 		req.Error(ErrNoHostsMatchTags)
 		return
 	}
@@ -790,6 +793,7 @@ func (s *Scheduler) handleFormationDiff(f *Formation, diff Processes) {
 					AppID:     f.App.ID,
 					ReleaseID: f.Release.ID,
 					Formation: f,
+					reason:    "awaiting placement",
 					startedAt: time.Now(),
 					state:     JobStatePending,
 				}
@@ -1437,6 +1441,7 @@ func (s *Scheduler) restartJob(job *Job) {
 		AppID:     job.AppID,
 		ReleaseID: job.ReleaseID,
 		Formation: job.Formation,
+		reason:    fmt.Sprintf("waiting for restart backoff"),
 		runAt:     typeconv.TimePtr(time.Now().Add(backoff)),
 		startedAt: time.Now(),
 		state:     JobStatePending,

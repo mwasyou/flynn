@@ -87,6 +87,10 @@ type Job struct {
 	// referenced from within the main scheduler loop
 	state JobState
 
+	// reason is a human readable indication of why a job is currently
+	// pending. It is only valid while the job is in the pending state.
+	reason string
+
 	// metadata is the cluster job's metadata, assigned whenever a host
 	// event is received for the job, and is used when persisting the job
 	// to the controller
@@ -157,6 +161,7 @@ func (j *Job) ControllerJob() *ct.Job {
 	switch j.state {
 	case JobStatePending:
 		job.State = ct.JobStatePending
+		job.Reason = &j.reason
 	case JobStateStarting:
 		job.State = ct.JobStateStarting
 	case JobStateRunning:
